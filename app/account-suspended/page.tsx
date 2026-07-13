@@ -1,0 +1,3 @@
+import { ShieldAlert } from "lucide-react";
+import { Logo } from "@/app/components/Logo";
+export default function AccountSuspendedPage() { return <main className="expired-shell"><Logo /><div className="expired-icon"><ShieldAlert /></div><p className="section-kicker">Account suspended</p><h1>Your access is temporarily unavailable.</h1><p>Your private records remain protected. Please contact the coaching team if you believe this is a mistake.</p><a className="button button-primary" href="/contact-support">Contact support</a><form action="/api/auth/sign-out" method="post"><button className="button button-quiet">Sign out</button></form></main>; }

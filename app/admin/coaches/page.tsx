@@ -1,0 +1,7 @@
+import { UserRoundCog } from "lucide-react";
+import { requireAccess } from "@/lib/access-control";
+import { createClient } from "@/lib/supabase/server";
+import { AdminShell } from "../../components/AdminShell";
+
+export const dynamic = "force-dynamic";
+export default async function CoachesPage() { await requireAccess(["admin"]); const supabase = await createClient(); const { data: coaches } = await supabase.from("profiles").select("id,full_name,email,account_status,last_login_at").eq("role", "coach").order("full_name"); return <AdminShell active="coaches"><header className="page-header"><div><p className="section-kicker">Coaching team</p><h1>Coaches</h1><span>Authorised coaches can view assigned clients only.</span></div></header><section className="admin-table-card coach-table"><div className="admin-table-head"><span>Coach</span><span>Status</span><span>Last login</span></div>{coaches?.length ? coaches.map((coach) => <div className="admin-table-row" key={coach.id}><span><strong>{coach.full_name ?? "Coach"}</strong><small>{coach.email}</small></span><span><i className={`status-${coach.account_status}`}>{coach.account_status}</i></span><span>{coach.last_login_at ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(coach.last_login_at)) : "Never"}</span></div>) : <div className="admin-empty"><UserRoundCog /><h3>No coaches yet</h3><p>Bootstrap a coach account through the documented secure process.</p></div>}</section></AdminShell>; }
