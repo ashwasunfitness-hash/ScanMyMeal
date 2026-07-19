@@ -307,8 +307,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { 
 .meal-use-button { width:100%; min-height:54px; }
 .meal-use-button:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
 .meal-ready-message { margin:11px 0 0!important; padding:10px 12px; border-radius:11px; background:var(--green-soft); color:var(--green-deep)!important; font-size:10px!important; font-weight:700; line-height:1.5!important; }
+.meal-upload-progress { margin-top:13px; padding:14px; border:1px solid rgba(49,92,74,.14); border-radius:13px; background:var(--green-soft); color:var(--green-deep); }
+.meal-upload-progress>div { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:10px; font-weight:800; }
+.meal-upload-progress progress { width:100%; height:7px; margin:10px 0 7px; border:0; border-radius:99px; display:block; overflow:hidden; appearance:none; background:rgba(49,92,74,.12); }
+.meal-upload-progress progress::-webkit-progress-bar { border-radius:99px; background:rgba(49,92,74,.12); }.meal-upload-progress progress::-webkit-progress-value { border-radius:99px; background:var(--green); }.meal-upload-progress progress::-moz-progress-bar { border-radius:99px; background:var(--green); }
+.meal-upload-progress small { color:#52685e; font-size:9px; line-height:1.45; }
+.meal-upload-success { margin-top:13px; padding:15px; border:1px solid rgba(49,92,74,.16); border-radius:14px; display:flex; align-items:flex-start; gap:11px; background:var(--green-soft); color:var(--green-deep); }
+.meal-upload-success>svg { width:21px; height:21px; flex:0 0 21px; }.meal-upload-success p { margin:0; display:flex; flex-direction:column; gap:4px; }.meal-upload-success strong { font-size:12px; }.meal-upload-success span { font-size:10px; line-height:1.5; }
+.meal-upload-failure { margin-top:13px; padding:14px; border:1px solid #e1b8b1; border-radius:13px; background:#fff3f1; color:#8b4c45; }
+.meal-upload-failure p { margin:0; font-size:10px; font-weight:700; line-height:1.55; }.meal-upload-failure button { min-height:44px; margin-top:10px; padding:0 15px; border:0; border-radius:11px; background:#8b4c45; color:#fff; font-size:11px; font-weight:800; cursor:pointer; }
 .meal-replace-actions { margin-top:11px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .meal-replace-actions button { min-height:46px; padding:0 10px; border:1px solid var(--line); background:#fff; color:var(--green-deep); }
+.meal-replace-actions button:disabled { opacity:.45; cursor:not-allowed; }
 .meal-replace-actions .meal-remove-button { grid-column:1/-1; border-color:transparent; background:transparent; color:#92534d; }
 .meal-capture-error { margin:0 clamp(18px,3.5vw,34px) 20px; padding:13px 15px; border:1px solid #e1b8b1; border-radius:13px; background:#fff3f1; color:#8b4c45; font-size:12px; font-weight:700; line-height:1.5; }
 .meal-privacy-note { min-height:72px; padding:15px clamp(20px,4vw,34px); border-top:1px solid var(--line); display:flex; align-items:center; gap:13px; background:rgba(223,233,223,.38); }

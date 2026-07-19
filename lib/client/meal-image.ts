@@ -32,6 +32,30 @@ export type MealImageAction<TFile extends MealImageFile = File> =
 
 export const initialMealImageState: MealImageState = { file: null, error: null, confirmed: false };
 
+export type MealUploadState = {
+  phase: "idle" | "uploading" | "success" | "retryable_failure" | "non_retryable_failure";
+  progress: number;
+  message: string | null;
+  uploadId: string | null;
+};
+
+export type MealUploadAction =
+  | { type: "reset" }
+  | { type: "start" }
+  | { type: "progress"; progress: number }
+  | { type: "success"; uploadId: string }
+  | { type: "failure"; message: string; retryable: boolean };
+
+export const initialMealUploadState: MealUploadState = { phase: "idle", progress: 0, message: null, uploadId: null };
+
+export function mealUploadReducer(state: MealUploadState, action: MealUploadAction): MealUploadState {
+  if (action.type === "reset") return initialMealUploadState;
+  if (action.type === "start") return { phase: "uploading", progress: 0, message: null, uploadId: null };
+  if (action.type === "progress") return state.phase === "uploading" ? { ...state, progress: Math.max(0, Math.min(95, Math.round(action.progress))) } : state;
+  if (action.type === "success") return { phase: "success", progress: 100, message: "Your meal photo was uploaded privately.", uploadId: action.uploadId };
+  return { phase: action.retryable ? "retryable_failure" : "non_retryable_failure", progress: 0, message: action.message, uploadId: null };
+}
+
 export function validateMealImage(file: MealImageFile): string | null {
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   const hasAllowedType = ALLOWED_MIME_TYPES.has(file.type.toLowerCase());

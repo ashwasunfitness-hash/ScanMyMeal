@@ -27,6 +27,12 @@ export type MealEntryRow = {
   analysis_version: string; ai_provider: string | null; created_at: string; updated_at: string;
 };
 
+export type MealUploadRow = {
+  id: string; client_id: string; storage_path: string; upload_status: "pending_upload" | "uploaded" | "upload_failed";
+  mime_type: "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif"; file_size_bytes: number;
+  idempotency_key: string; created_at: string; updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -39,6 +45,7 @@ export type Database = {
       consent_records: RowShape<{ id: string; user_id: string; consent_type: string; document_version: string; accepted_at: string; revoked_at: string | null; created_at: string }>;
       audit_logs: RowShape<{ id: string; actor_user_id: string | null; action: string; target_type: string; target_id: string | null; metadata: Json; created_at: string }>;
       meal_entries: RowShape<MealEntryRow>;
+      meal_uploads: RowShape<MealUploadRow>;
       meal_items: RowShape<{ id: string; meal_id: string; detected_name: string; canonical_name: string | null; serving_label: string; grams: number | null; calories_kcal: number; protein_g: number; carbohydrates_g: number; fat_g: number; fibre_g: number; confidence: number; nutrition_source: string }>;
       coach_feedback: RowShape<{ id: string; client_id: string; coach_id: string; meal_id: string | null; body: string; is_client_visible: boolean; created_at: string; updated_at: string }>;
       onboarding_drafts: RowShape<{ user_id: string; step: number; payload: Json; updated_at: string }>;
