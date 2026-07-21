@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
-import { Camera, Check, ImagePlus, LockKeyhole, RefreshCw, Trash2 } from "lucide-react";
+import { Camera, Check, CheckCircle2, Clock3, ImagePlus, LoaderCircle, LockKeyhole, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { initialMealImageState, initialMealUploadState, MEAL_IMAGE_ACCEPT, mealImageReducer, mealUploadReducer, validateMealImage } from "@/lib/client/meal-image";
+import { ANALYSIS_POLL_INTERVAL_MS, ANALYSIS_POLL_TIMEOUT_MS, parseMealAnalysisJob, shouldPollAnalysis, type MealAnalysisJobStatusResponse } from "@/lib/client/meal-analysis-job";
 
 export function MealImageCapture() {
   const [state, dispatch] = useReducer(mealImageReducer<File>, initialMealImageState);
@@ -10,12 +11,48 @@ export function MealImageCapture() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const [uploadKey, setUploadKey] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<MealAnalysisJobStatusResponse | null>(null);
+  const [analysisNotice, setAnalysisNotice] = useState<string | null>(null);
+  const [retryingAnalysis, setRetryingAnalysis] = useState(false);
+  const pollingStartedAt = useRef<number | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (!analysis || !shouldPollAnalysis(analysis.status, elapsedPollingTime(pollingStartedAt.current))) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function poll() {
+      const elapsed = elapsedPollingTime(pollingStartedAt.current);
+      if (elapsed >= ANALYSIS_POLL_TIMEOUT_MS) {
+        if (!cancelled) setAnalysisNotice("Analysis is taking a little longer than usual. You can leave this page and check again later.");
+        return;
+      }
+      try {
+        const response = await fetch(`/api/meal-analysis-jobs/${analysis!.jobId}`, { cache: "no-store" });
+        const payload: unknown = await response.json();
+        const next = response.ok ? parseMealAnalysisJob(payload) : null;
+        if (!cancelled && next) {
+          setAnalysis(next);
+          setAnalysisNotice(null);
+          if (shouldPollAnalysis(next.status, elapsedPollingTime(pollingStartedAt.current))) timer = setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
+          return;
+        }
+        if (!cancelled) setAnalysisNotice("We could not refresh the status right now. We’ll try again shortly.");
+      } catch {
+        if (!cancelled) setAnalysisNotice("We could not refresh the status right now. We’ll try again shortly.");
+      }
+      if (!cancelled) timer = setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
+    }
+
+    timer = setTimeout(poll, ANALYSIS_POLL_INTERVAL_MS);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [analysis]);
 
   function selectFile(file: File | undefined, input: HTMLInputElement) {
     if (file) {
@@ -24,6 +61,9 @@ export function MealImageCapture() {
         setPreviewUrl(URL.createObjectURL(file));
         setPreviewError(false);
         setUploadKey(globalThis.crypto?.randomUUID?.() ?? null);
+        setAnalysis(null);
+        setAnalysisNotice(null);
+        pollingStartedAt.current = null;
         uploadDispatch({ type: "reset" });
       }
     }
@@ -34,6 +74,9 @@ export function MealImageCapture() {
     setPreviewUrl(null);
     setPreviewError(false);
     setUploadKey(null);
+    setAnalysis(null);
+    setAnalysisNotice(null);
+    pollingStartedAt.current = null;
     uploadDispatch({ type: "reset" });
     dispatch({ type: "remove" });
   }
@@ -48,8 +91,29 @@ export function MealImageCapture() {
 
     uploadDispatch({ type: "start" });
     const result = await uploadImage(state.file, uploadKey, (progress) => uploadDispatch({ type: "progress", progress }));
-    if (result.ok) uploadDispatch({ type: "success", uploadId: result.uploadId });
+    if (result.ok) {
+      setAnalysis(result.analysisJob);
+      setAnalysisNotice(null);
+      pollingStartedAt.current = Date.now();
+      uploadDispatch({ type: "success", uploadId: result.uploadId });
+    }
     else uploadDispatch({ type: "failure", retryable: result.retryable, message: result.message });
+  }
+
+  async function retryAnalysis() {
+    if (!analysis?.retryable || retryingAnalysis) return;
+    setRetryingAnalysis(true);
+    setAnalysisNotice(null);
+    try {
+      const response = await fetch(`/api/meal-analysis-jobs/${analysis.jobId}/retry`, { method: "POST" });
+      const payload: unknown = await response.json();
+      const next = response.ok ? parseMealAnalysisJob(payload) : null;
+      if (next) {
+        setAnalysis(next);
+        pollingStartedAt.current = Date.now();
+      } else setAnalysisNotice("The retry could not be started right now. Please try again.");
+    } catch { setAnalysisNotice("The retry could not be started right now. Please check your connection."); }
+    finally { setRetryingAnalysis(false); }
   }
 
   return <section className="meal-capture-card" aria-labelledby="meal-capture-title">
@@ -81,7 +145,7 @@ export function MealImageCapture() {
         <dl className="meal-file-details"><div><dt>File</dt><dd>{state.file.name}</dd></div><div><dt>Size</dt><dd>{formatFileSize(state.file.size)}</dd></div></dl>
         <button className="meal-use-button" type="button" disabled={previewError || upload.phase === "uploading" || upload.phase === "success"} onClick={beginUpload}><Check aria-hidden="true" />{upload.phase === "uploading" ? "Uploading…" : upload.phase === "success" ? "Photo uploaded" : "Use this photo"}</button>
         {upload.phase === "uploading" && <div className="meal-upload-progress" role="status" aria-live="polite"><div><span>Uploading privately</span><strong>{upload.progress}%</strong></div><progress max="100" value={upload.progress}>{upload.progress}%</progress><small>{upload.progress >= 95 ? "Finalizing secure upload…" : "Keep this page open until the upload finishes."}</small></div>}
-        {upload.phase === "success" && <div className="meal-upload-success" role="status"><Check aria-hidden="true" /><p><strong>Meal photo uploaded</strong><span>{upload.message} Analysis will happen in a later step.</span></p></div>}
+        {upload.phase === "success" && analysis && <AnalysisLifecycle job={analysis} notice={analysisNotice} retrying={retryingAnalysis} onRetry={retryAnalysis} />}
         {(upload.phase === "retryable_failure" || upload.phase === "non_retryable_failure") && <div className={`meal-upload-failure ${upload.phase}`} role="alert"><p>{upload.message}</p>{upload.phase === "retryable_failure" && <button type="button" onClick={beginUpload}>Retry upload</button>}</div>}
         {upload.phase !== "success" && <div className="meal-replace-actions" aria-label="Change selected image">
           <button type="button" disabled={upload.phase === "uploading"} onClick={() => cameraInput.current?.click()}><RefreshCw aria-hidden="true" />Retake photo</button>
@@ -92,11 +156,27 @@ export function MealImageCapture() {
     </div>}
 
     {state.error && <div className="meal-capture-error" role="alert">{state.error}</div>}
-    <div className="meal-privacy-note"><LockKeyhole aria-hidden="true" /><p><strong>Your meal photo is stored privately.</strong><span>It is visible only to you and authorized coaching staff. Analysis will happen in a later step.</span></p></div>
+    <div className="meal-privacy-note"><LockKeyhole aria-hidden="true" /><p><strong>Your meal photo is stored privately.</strong><span>It is visible only to you and authorized coaching staff.</span></p></div>
   </section>;
 }
 
-type UploadResponse = { ok: true; uploadId: string } | { ok: false; retryable: boolean; message: string };
+function AnalysisLifecycle({ job, notice, retrying, onRetry }: { job: MealAnalysisJobStatusResponse; notice: string | null; retrying: boolean; onRetry: () => void }) {
+  const content = {
+    queued: { title: "Your meal is waiting for analysis.", detail: "The secure analysis job has been queued.", icon: Clock3 },
+    processing: { title: "Your meal is being analysed.", detail: "Keep this page open or return later to check the status.", icon: LoaderCircle },
+    completed: { title: "Analysis is ready.", detail: "Nutrition results are not shown in this step.", icon: CheckCircle2 },
+    failed: { title: "Analysis could not be completed.", detail: job.retryable ? "You can safely retry this analysis." : "This analysis cannot be retried from the app.", icon: XCircle },
+  }[job.status];
+  const Icon = content.icon;
+  return <div className={`meal-analysis-status status-${job.status}`} role="status" aria-live="polite" aria-atomic="true">
+    <Icon className={job.status === "processing" ? "status-spinner" : ""} aria-hidden="true" />
+    <div><strong>{content.title}</strong><span>{content.detail}</span>{notice && <small>{notice}</small>}
+      {job.status === "failed" && job.retryable && <button type="button" disabled={retrying} onClick={onRetry}><RefreshCw aria-hidden="true" />{retrying ? "Starting retry…" : "Retry analysis"}</button>}
+    </div>
+  </div>;
+}
+
+type UploadResponse = { ok: true; uploadId: string; analysisJob: MealAnalysisJobStatusResponse } | { ok: false; retryable: boolean; message: string };
 
 function uploadImage(file: File, uploadKey: string, onProgress: (progress: number) => void): Promise<UploadResponse> {
   return new Promise((resolve) => {
@@ -110,14 +190,17 @@ function uploadImage(file: File, uploadKey: string, onProgress: (progress: numbe
     request.onerror = () => resolve({ ok: false, retryable: true, message: "Your connection was interrupted. Check it and retry—the photo is still selected." });
     request.ontimeout = () => resolve({ ok: false, retryable: true, message: "The upload took too long. Check your connection and retry." });
     request.onload = () => {
-      let payload: { uploadId?: string; error?: string; retryable?: boolean } = {};
+      let payload: { uploadId?: string; analysisJob?: unknown; error?: string; retryable?: boolean } = {};
       try { payload = JSON.parse(request.responseText) as typeof payload; } catch { /* Use the safe fallback below. */ }
-      if (request.status >= 200 && request.status < 300 && payload.uploadId) resolve({ ok: true, uploadId: payload.uploadId });
+      const analysisJob = parseMealAnalysisJob(payload.analysisJob);
+      if (request.status >= 200 && request.status < 300 && payload.uploadId && analysisJob) resolve({ ok: true, uploadId: payload.uploadId, analysisJob });
       else resolve({ ok: false, retryable: payload.retryable === true, message: payload.error ?? "The secure upload could not be completed. Choose the photo again or try later." });
     };
     request.send(form);
   });
 }
+
+function elapsedPollingTime(startedAt: number | null) { return startedAt === null ? 0 : Date.now() - startedAt; }
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;

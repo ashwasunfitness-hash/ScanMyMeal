@@ -3,6 +3,8 @@ import { getAccessContext } from "@/lib/access-control";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { authorizeMealUpload, executeMealUpload, MAX_MEAL_UPLOAD_BYTES, MEAL_IMAGE_BUCKET, validateImageBytes } from "@/lib/server/meal-upload";
+import { createMealAnalysisJob } from "@/lib/server/meal-analysis-job";
+import { createMealAnalysisJobRepository } from "@/lib/server/supabase-meal-analysis-jobs";
 
 export const dynamic = "force-dynamic";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -54,7 +56,16 @@ export async function POST(request: Request) {
     now: () => new Date(),
   });
 
-  if (result.ok) return NextResponse.json({ uploadId: result.uploadId, status: "uploaded", duplicate: result.duplicate }, { status: result.duplicate ? 200 : 201 });
+  if (result.ok) {
+    const jobResult = await createMealAnalysisJob(access, result.uploadId, createMealAnalysisJobRepository(admin));
+    if (!jobResult.ok) return responseError(jobResult.code, "Your photo was uploaded, but analysis could not be queued yet. Retry to continue safely.", jobResult.status, jobResult.status >= 500);
+    return NextResponse.json({
+      uploadId: result.uploadId,
+      status: "uploaded",
+      duplicate: result.duplicate,
+      analysisJob: jobResult.job,
+    }, { status: result.duplicate || jobResult.duplicate ? 200 : 201 });
+  }
   const messages = {
     upload_in_progress: "This photo is already being uploaded. Wait a moment, then retry.",
     storage_failure: "The private image upload was interrupted. Your photo is still selected, so you can retry.",
