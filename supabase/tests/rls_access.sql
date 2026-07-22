@@ -1,7 +1,7 @@
 begin;
 
 -- Run with `supabase test db` against a local project. These assertions fail closed.
-select plan(20);
+select plan(22);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'programmes', 'programmes exists');
@@ -12,6 +12,7 @@ select has_table('public', 'meal_uploads', 'meal uploads exists');
 select has_table('public', 'meal_analysis_jobs', 'meal analysis jobs exists');
 select has_table('public', 'meal_recognition_results', 'meal recognition results exists');
 select has_table('public', 'meal_food_confirmations', 'meal food confirmations exists');
+select has_table('public', 'meal_portion_confirmations', 'meal portion confirmations exists');
 select has_function('public', 'is_admin', array[]::text[], 'admin helper exists');
 select has_function('public', 'is_assigned_coach', array['uuid'], 'coach assignment helper exists');
 select has_function('public', 'has_active_access', array['uuid'], 'active-access helper exists');
@@ -23,6 +24,7 @@ select policies_are('public', 'meal_uploads', array['meal_uploads_select_authori
 select policies_are('public', 'meal_analysis_jobs', array['meal_analysis_jobs_select_authorised'], 'analysis jobs are read-only to authorised users');
 select policies_are('public', 'meal_recognition_results', array['meal_recognition_results_select_authorised'], 'recognition results are read-only to authorised users');
 select policies_are('public', 'meal_food_confirmations', array['meal_food_confirmations_select_authorised'], 'food confirmations are immutable and readable by authorised users');
+select policies_are('public', 'meal_portion_confirmations', array['meal_portion_confirmations_select_authorised'], 'portion confirmations are immutable and readable by authorised users');
 
 select * from finish();
 rollback;

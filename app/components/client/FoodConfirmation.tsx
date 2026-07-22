@@ -5,6 +5,7 @@ import { CheckCircle2, ImagePlus, LoaderCircle, Plus, RotateCcw, Trash2 } from "
 import { addDraftFood, canSubmitFoodConfirmation, createFoodConfirmationDraft, foodDraftErrors, removeDraftFood, renameDraftFood, validateFoodConfirmationDraft } from "@/lib/client/meal-food-confirmation";
 import { safeFoodConfirmationSchema, type ConfirmedFood, type SafeFoodConfirmationPayload } from "@/lib/meal-food-confirmation-contract";
 import type { MealRecognition } from "@/lib/meal-recognition-contract";
+import { PortionConfirmation } from "@/app/components/client/PortionConfirmation";
 
 export function FoodConfirmation({ jobId, recognition, onReplace }: { jobId: string; recognition: MealRecognition; onReplace: () => void }) {
   const [foods, setFoods] = useState<ConfirmedFood[]>(() => createFoodConfirmationDraft(recognition.foods));
@@ -102,11 +103,10 @@ export function FoodConfirmation({ jobId, recognition, onReplace }: { jobId: str
     finally { submissionLocked.current = false; setSaving(false); }
   }
 
-  if (confirmation) return <section className="food-confirmation confirmed" aria-labelledby="foods-confirmed-title" role="status" aria-live="polite">
+  if (confirmation) return <><section className="food-confirmation confirmed" aria-labelledby="foods-confirmed-title">
     <div className="food-confirmation-heading"><CheckCircle2 aria-hidden="true" /><div><h3 id="foods-confirmed-title">Foods confirmed</h3><p>Your food list is ready for portion review.</p></div></div>
     <ul className="confirmed-food-list">{confirmation.foods.map((food) => <li key={food.id}><span>{food.name}</span><small>{food.source === "user_added" ? "Added by you" : "Recognized and confirmed"}</small></li>)}</ul>
-    <button className="portion-next-placeholder" type="button" disabled>Portion review coming next</button>
-  </section>;
+  </section><PortionConfirmation jobId={jobId} foods={confirmation.foods} /></>;
 
   return <section className="food-confirmation" aria-labelledby="food-review-title">
     <div className="food-confirmation-heading"><div><h3 id="food-review-title">Review detected foods</h3><p>Keep what is correct, edit anything inaccurate, and add foods the AI missed.</p></div></div>
