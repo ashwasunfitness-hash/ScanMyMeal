@@ -45,6 +45,11 @@ export type MealRecognitionResultRow = {
   created_at: string; updated_at: string;
 };
 
+export type MealFoodConfirmationRow = {
+  id: string; analysis_job_id: string; recognition_result_id: string; meal_upload_id: string; client_id: string;
+  status: "confirmed"; foods: Json; confirmed_at: string; created_at: string; updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -60,6 +65,7 @@ export type Database = {
       meal_uploads: RowShape<MealUploadRow>;
       meal_analysis_jobs: RowShape<MealAnalysisJobRow>;
       meal_recognition_results: RowShape<MealRecognitionResultRow>;
+      meal_food_confirmations: RowShape<MealFoodConfirmationRow>;
       meal_items: RowShape<{ id: string; meal_id: string; detected_name: string; canonical_name: string | null; serving_label: string; grams: number | null; calories_kcal: number; protein_g: number; carbohydrates_g: number; fat_g: number; fibre_g: number; confidence: number; nutrition_source: string }>;
       coach_feedback: RowShape<{ id: string; client_id: string; coach_id: string; meal_id: string | null; body: string; is_client_visible: boolean; created_at: string; updated_at: string }>;
       onboarding_drafts: RowShape<{ user_id: string; step: number; payload: Json; updated_at: string }>;

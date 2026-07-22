@@ -4,6 +4,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { Camera, Check, CheckCircle2, Clock3, ImagePlus, LoaderCircle, LockKeyhole, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { initialMealImageState, initialMealUploadState, MEAL_IMAGE_ACCEPT, mealImageReducer, mealUploadReducer, validateMealImage } from "@/lib/client/meal-image";
 import { ANALYSIS_POLL_INTERVAL_MS, ANALYSIS_POLL_TIMEOUT_MS, parseMealAnalysisJob, recognitionTriggerKey, shouldPollAnalysis, shouldTriggerRecognition, type MealAnalysisJobStatusResponse } from "@/lib/client/meal-analysis-job";
+import { FoodConfirmation } from "@/app/components/client/FoodConfirmation";
 
 const RESTORED_JOB_KEY = "scan-my-meal:active-analysis-job";
 
@@ -224,22 +225,8 @@ function AnalysisLifecycle({ job, notice, retrying, onRetry, onReplace }: { job:
     <div><strong>{content.title}</strong><span>{content.detail}</span>{notice && <small>{notice}</small>}
       {job.status === "failed" && job.retryable && <button type="button" disabled={retrying} onClick={onRetry}><RefreshCw aria-hidden="true" />{retrying ? "Starting retry…" : "Retry analysis"}</button>}
     </div>
-  </div>{job.status === "completed" && job.recognition && <RecognitionResults recognition={job.recognition} onReplace={onReplace} />}</>;
+  </div>{job.status === "completed" && job.recognition && <FoodConfirmation jobId={job.jobId} recognition={job.recognition} onReplace={onReplace} />}</>;
 }
-
-function RecognitionResults({ recognition, onReplace }: { recognition: NonNullable<MealAnalysisJobStatusResponse["recognition"]>; onReplace: () => void }) {
-  return <section className="meal-recognition-results" aria-labelledby="foods-detected-title">
-    <h3 id="foods-detected-title">Foods detected</h3>
-    <p>Please review these items. You’ll be able to confirm or correct them in the next step.</p>
-    {recognition.foods.length > 0 ? <ul>{recognition.foods.map((food) => <li key={food.id}>
-      <div><strong>{food.name}</strong>{food.label && <span>{food.label}</span>}</div>
-      <dl><div><dt>Confidence</dt><dd>{confidenceText(food.confidence)}</dd></div>{food.category && <div><dt>Category</dt><dd>{food.category}</dd></div>}</dl>
-      {food.evidence && <p>{food.evidence}</p>}
-    </li>)}</ul> : <div className="meal-no-food"><strong>No recognizable food was found.</strong><span>Try a clearer photo with the full meal visible.</span><button type="button" onClick={onReplace}><ImagePlus aria-hidden="true" />Choose another photo</button></div>}
-  </section>;
-}
-
-function confidenceText(value: "high" | "medium" | "low") { return `${value.charAt(0).toUpperCase()}${value.slice(1)} confidence`; }
 
 type UploadResponse = { ok: true; uploadId: string; analysisJob: MealAnalysisJobStatusResponse } | { ok: false; retryable: boolean; message: string };
 
