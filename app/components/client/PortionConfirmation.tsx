@@ -5,6 +5,7 @@ import { CheckCircle2, LoaderCircle } from "lucide-react";
 import { PORTION_SIZES, PORTION_UNITS, canSubmitPortions, createPortionDraft, formatPortionLabel, portionDraftErrors, suggestedPortionUnits, updatePortionDraft } from "@/lib/client/meal-portion-confirmation";
 import type { ConfirmedFoodList } from "@/lib/meal-food-confirmation-contract";
 import { safePortionConfirmationSchema, type PortionRequestItem, type PortionSize, type PortionUnit, type SafePortionConfirmationPayload } from "@/lib/meal-portion-confirmation-contract";
+import { MealNutritionResult } from "@/app/components/client/MealNutritionResult";
 
 export function PortionConfirmation({ jobId, foods }: { jobId: string; foods: ConfirmedFoodList }) {
   const [portions, setPortions] = useState<PortionRequestItem[]>(() => createPortionDraft(foods));
@@ -65,12 +66,11 @@ export function PortionConfirmation({ jobId, foods }: { jobId: string; foods: Co
     finally { submissionLocked.current = false; setSaving(false); }
   }
 
-  if (confirmation) return <section className="portion-confirmation portion-confirmed" aria-labelledby="portions-confirmed-title">
+  if (confirmation) return <><section className="portion-confirmation portion-confirmed" aria-labelledby="portions-confirmed-title">
     <div className="portion-heading"><CheckCircle2 aria-hidden="true" /><div><h3 id="portions-confirmed-title">Portions confirmed</h3><p>Your meal is ready for nutrition analysis.</p></div></div>
     <p className="sr-only" role="status" aria-live="polite">Portions saved successfully.</p>
     <ul className="confirmed-portion-list">{confirmation.portions.map((portion) => <li key={portion.id}><strong>{portion.foodName}</strong><span>{formatPortionLabel(portion.quantity, portion.unit, portion.size)}</span></li>)}</ul>
-    <button className="nutrition-next-placeholder" type="button" disabled>Nutrition analysis coming next</button>
-  </section>;
+  </section><MealNutritionResult jobId={jobId} /></>;
 
   if (foods.length === 0) return <section className="portion-confirmation" aria-labelledby="portion-review-title"><h3 id="portion-review-title">Review portions</h3><p role="alert">The confirmed food list is empty. Return to the food-confirmation step before adding portions.</p></section>;
 
