@@ -2,6 +2,7 @@ import { nutritionResultItemsSchema, nutritionValuesSchema, type NutritionResult
 import type { ConfirmedFoodList } from "#/lib/meal-food-confirmation-contract";
 import type { ConfirmedPortionList } from "#/lib/meal-portion-confirmation-contract";
 import type { NutritionCatalogue, NutritionCatalogueFood, NutritionPortionConversion } from "#/lib/server/nutrition-catalogue";
+import { normalizeCatalogueLabel } from "#/lib/server/nutrition-catalogue-schema";
 
 export type NutritionCalculation = {
   status: "completed" | "partial" | "failed";
@@ -14,7 +15,7 @@ export type NutritionCalculation = {
 };
 
 export function normalizeNutritionFoodName(value: string) {
-  return value.trim().toLocaleLowerCase("en-IN").replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+  return normalizeCatalogueLabel(value);
 }
 
 export function findCatalogueFood(name: string, catalogue: NutritionCatalogue): NutritionCatalogueFood | null {

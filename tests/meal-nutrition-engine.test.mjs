@@ -31,12 +31,10 @@ const componentSource = readFileSync(new URL("../app/components/client/MealNutri
 const providerSource = readFileSync(new URL("../lib/server/meal-recognition-provider.ts", import.meta.url), "utf8");
 
 test("catalogue provenance and versions are explicit and reviewable", () => {
-  assert.equal(NUTRITION_CATALOGUE_VERSION, "usda-sr-legacy-starter-2026-07-23");
+  assert.equal(NUTRITION_CATALOGUE_VERSION, "india-plant-starter-v1-2026-07-23");
   assert.equal(NUTRITION_ENGINE_VERSION, "deterministic-household-v1");
-  assert.deepEqual(STARTER_NUTRITION_CATALOGUE.foods.map((food) => food.sourceReference), [
-    "FDC 173944; nutrient basis per 100 g; listed edible portion weights",
-    "FDC 169704; nutrient basis per 100 g; 1 cup = 202 g",
-  ]);
+  assert.equal(STARTER_NUTRITION_CATALOGUE.foods.length, 40);
+  assert.equal(STARTER_NUTRITION_CATALOGUE.foods.every((food) => /^FDC \d+$/.test(food.provenance.sourceIdentifier)), true);
 });
 
 test("exact canonical, normalized alias, whitespace, case, and approved alias matching are deterministic", () => {
