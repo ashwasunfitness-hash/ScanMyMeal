@@ -1,34 +1,73 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { mealAnalysisSchema } from "@/lib/meal-analysis";
-import { requireActiveApiClient } from "@/lib/api-auth";
-import { createClient } from "@/lib/supabase/server";
+import { getAccessContext } from "@/lib/access-control";
+import { saveMealRequestSchema } from "@/lib/meal-save-contract";
+import { listMealHistory, type MealHistoryFailureCode } from "@/lib/server/meal-history";
+import { saveMeal, type MealSaveFailureCode } from "@/lib/server/meal-save";
+import { authorizeMealUpload } from "@/lib/server/meal-upload";
+import { createMealHistoryRepository, createMealSaveRepository } from "@/lib/server/supabase-meal-save";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
-const schema = z.object({ mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]), notes: z.string().max(1000).optional().default(""), imageKey: z.string().max(500).optional(), analysis: mealAnalysisSchema });
 
-export async function GET() {
-  const context = await requireActiveApiClient();
-  if (!context) return NextResponse.json({ error: "Your programme access is not active." }, { status: 403 });
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("meal_entries").select("id, meal_type, title, calories_kcal, protein_g, carbohydrates_g, fat_g, fibre_g, status, created_at").eq("client_id", context.userId).order("created_at", { ascending: false }).limit(50);
-  if (error) return NextResponse.json({ error: "Meal history is temporarily unavailable." }, { status: 503 });
-  return NextResponse.json({ meals: data.map((meal) => ({ id: meal.id, mealType: meal.meal_type, title: meal.title, caloriesKcal: meal.calories_kcal, proteinG: meal.protein_g, carbsG: meal.carbohydrates_g, fatG: meal.fat_g, fibreG: meal.fibre_g, status: meal.status, createdAt: new Date(meal.created_at).getTime() })) });
+export async function GET(request: Request) {
+  const cursor = new URL(request.url).searchParams.get("cursor");
+  try {
+    const access = authorizeMealUpload(await getAccessContext());
+    if (!access.allowed) return historyErrorResponse(access.code, access.status, false);
+    const result = await listMealHistory(access, cursor, createMealHistoryRepository(createAdminClient()));
+    if (!result.ok) return historyErrorResponse(result.code, result.status, result.retryable);
+    return NextResponse.json(result.value, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return historyErrorResponse("database_failure", 503, true);
+  }
+}
+
+function historyErrorResponse(code: MealHistoryFailureCode, status: number, retryable: boolean) {
+  const messages: Record<MealHistoryFailureCode, string> = {
+    authentication_required: "Sign in again to view meal history.",
+    client_access_required: "Client access is required to view meal history.",
+    client_access_expired: "Active programme access is required to view meal history.",
+    invalid_cursor: "This meal-history page link is invalid. Refresh to start again.",
+    meal_not_found: "This saved meal is not available.",
+    history_data_invalid: "This saved meal could not be displayed safely.",
+    database_failure: "Meal history is temporarily unavailable. Please retry.",
+  };
+  return NextResponse.json({ code, error: messages[code], retryable }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
-  const context = await requireActiveApiClient();
-  if (!context) return NextResponse.json({ error: "Your programme access is not active." }, { status: 403 });
-  const input = schema.safeParse(await request.json());
-  if (!input.success) return NextResponse.json({ error: "Please review the meal details before saving." }, { status: 400 });
-  if (input.data.imageKey && !input.data.imageKey.startsWith(`${context.userId}/`)) return NextResponse.json({ error: "This photo does not belong to your account." }, { status: 403 });
-  const supabase = await createClient();
-  const id = crypto.randomUUID();
-  const { analysis } = input.data;
-  const { error } = await supabase.from("meal_entries").insert({ id, client_id: context.userId, programme_id: context.programme?.id ?? null, meal_type: input.data.mealType, title: analysis.mealTitle, image_path: input.data.imageKey ?? null, notes: input.data.notes, calories_kcal: analysis.totals.caloriesKcal, protein_g: analysis.totals.proteinG, carbohydrates_g: analysis.totals.carbsG, fat_g: analysis.totals.fatG, fibre_g: analysis.totals.fibreG, overall_confidence: analysis.overallConfidence, status: "confirmed", analysis_version: analysis.version, ai_provider: process.env.AI_ANALYSIS_ENDPOINT ? "configured-provider" : "development" });
-  if (error) return NextResponse.json({ error: "Your meal could not be saved." }, { status: 503 });
-  const items = analysis.items.map((item) => ({ id: crypto.randomUUID(), meal_id: id, detected_name: item.detectedName, canonical_name: item.canonicalFoodName, serving_label: item.estimatedServingLabel, grams: item.estimatedGrams, calories_kcal: item.nutrition.caloriesKcal, protein_g: item.nutrition.proteinG, carbohydrates_g: item.nutrition.carbsG, fat_g: item.nutrition.fatG, fibre_g: item.nutrition.fibreG, confidence: Math.min(item.foodConfidence, item.quantityConfidence), nutrition_source: item.nutritionSource }));
-  const { error: itemsError } = await supabase.from("meal_items").insert(items);
-  if (itemsError) { await supabase.from("meal_entries").delete().eq("id", id); return NextResponse.json({ error: "Your meal items could not be saved." }, { status: 503 }); }
-  return NextResponse.json({ id, saved: true }, { status: 201 });
+  let body: unknown;
+  try { body = await request.json(); }
+  catch { return errorResponse("invalid_meal_details", 422, false); }
+  const input = saveMealRequestSchema.safeParse(body);
+  if (!input.success) return errorResponse("invalid_meal_details", 422, false);
+  try {
+    const access = authorizeMealUpload(await getAccessContext());
+    if (!access.allowed) return errorResponse(access.code, access.status, false);
+    const result = await saveMeal(access, input.data, createMealSaveRepository(createAdminClient()));
+    if (!result.ok) return errorResponse(result.code, result.status, result.retryable);
+    return NextResponse.json(result.meal, { status: result.duplicate ? 200 : 201, headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return errorResponse("database_failure", 503, true);
+  }
+}
+
+function errorResponse(code: MealSaveFailureCode, status: number, retryable: boolean) {
+  const messages: Record<MealSaveFailureCode, string> = {
+    authentication_required: "Sign in again before saving this meal.",
+    client_access_required: "Client access is required to save meals.",
+    client_access_expired: "Active programme access is required to save meals.",
+    invalid_meal_details: "Choose a meal type and a valid eaten date and time.",
+    eaten_at_out_of_range: "Choose a time within the past 30 days and not in the future.",
+    analysis_job_not_found: "This meal analysis is not available.",
+    analysis_not_completed: "Meal analysis must finish before the meal can be saved.",
+    upload_not_completed: "The meal photo must finish uploading before the meal can be saved.",
+    food_confirmation_not_found: "Confirm the food list before saving this meal.",
+    portion_confirmation_not_found: "Confirm every portion before saving this meal.",
+    nutrition_result_not_found: "Calculate and save the nutrition result before saving this meal.",
+    nutrition_result_not_saveable: "This nutrition result cannot be saved as a meal.",
+    meal_already_saved: "This meal was already saved and cannot be changed.",
+    database_failure: "The meal could not be saved right now. Please retry.",
+  };
+  return NextResponse.json({ code, error: messages[code], retryable }, { status, headers: { "Cache-Control": "no-store" } });
 }

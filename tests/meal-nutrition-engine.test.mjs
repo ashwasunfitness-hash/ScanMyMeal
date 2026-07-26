@@ -165,10 +165,9 @@ test("refresh restores saved nutrition and safe response hides catalogue provena
 });
 
 test("UI handles calculation, complete, partial, unresolved and safe next-step states", () => {
-  for (const text of ["Calculating nutrition", "Meal nutrition", "Partial nutrition estimate", "Not included in totals", "Nutrition estimate unavailable", "Save meal coming next"]) assert.equal(componentSource.includes(text), true);
+  for (const text of ["Calculating nutrition", "Meal nutrition", "Partial nutrition estimate", "Not included in totals", "Nutrition estimate unavailable", "MealSaveForm"]) assert.equal(componentSource.includes(text), true);
   assert.equal(componentSource.includes("Nutrition values are estimates based on the confirmed foods and household portions."), true);
   assert.doesNotMatch(componentSource, /health score|medical advice|diagnos|supplement/i);
-  assert.doesNotMatch(componentSource, /fetch\([^)]*api\/meals/i);
   assert.match(componentSource, /triggerLocked\.current/);
   assert.equal(providerSource.includes("Do not estimate portions or calculate nutrition"), true);
 });

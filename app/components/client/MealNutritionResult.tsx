@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, LoaderCircle } from "lucide-react";
 import { NUTRIENT_LABELS, formatNutrient, formatNutritionItemPortion, incompleteNutritionLabel } from "@/lib/client/meal-nutrition-presentation";
 import { safeMealNutritionResultSchema, type SafeMealNutritionResult } from "@/lib/meal-nutrition-contract";
+import { MealSaveForm } from "@/app/components/client/MealSaveForm";
 
 export function MealNutritionResult({ jobId }: { jobId: string }) {
   const [result, setResult] = useState<SafeMealNutritionResult | null>(null);
@@ -69,6 +70,7 @@ function NutritionResultView({ result }: { result: SafeMealNutritionResult }) {
   if (result.status === "failed") return <section className="meal-nutrition-result nutrition-unavailable" aria-labelledby="nutrition-unavailable-title">
     <div className="nutrition-heading"><AlertCircle aria-hidden="true" /><div><h3 id="nutrition-unavailable-title">Nutrition estimate unavailable</h3><p>We couldn’t safely calculate this meal yet. Your confirmed foods and portions are still saved.</p></div></div>
     <UnresolvedFoods result={result} />
+    <MealSaveForm jobId={result.jobId} nutritionStatus={result.status} />
   </section>;
   const partial = result.status === "partial";
   return <section className="meal-nutrition-result" aria-labelledby="meal-nutrition-title">
@@ -77,7 +79,7 @@ function NutritionResultView({ result }: { result: SafeMealNutritionResult }) {
     {result.totals && <section className="nutrition-total-card" aria-labelledby="estimated-total-title"><h4 id="estimated-total-title">Estimated meal total{partial ? " (incomplete)" : ""}</h4><dl>{NUTRIENT_LABELS.map(({ key, label, unit }) => <div key={key}><dt>{label}</dt><dd>{formatNutrient(result.totals![key], unit)}</dd></div>)}</dl></section>}
     <section className="nutrition-item-breakdown" aria-labelledby="nutrition-breakdown-title"><h4 id="nutrition-breakdown-title">Food breakdown</h4><div>{result.items.map((item) => item.mappingStatus === "resolved" ? <article key={item.id} className="nutrition-item-card"><header><div><h5>{item.foodName}</h5><span>{formatNutritionItemPortion(item)}</span></div><small>Estimated</small></header><dl>{NUTRIENT_LABELS.map(({ key, label, unit }) => <div key={key}><dt>{label}</dt><dd>{formatNutrient(item.nutrition[key], unit)}</dd></div>)}</dl></article> : <article key={item.id} className="nutrition-item-card unresolved"><header><div><h5>{item.foodName}</h5><span>{formatNutritionItemPortion(item)}</span></div></header><strong>Not included in totals</strong><p>No safe catalogue match and portion conversion were available.</p></article>)}</div></section>
     <p className="nutrition-estimate-note">Nutrition values are estimates based on the confirmed foods and household portions.</p>
-    <button className="save-meal-placeholder" type="button" disabled>Save meal coming next</button>
+    <MealSaveForm jobId={result.jobId} nutritionStatus={result.status} />
   </section>;
 }
 
